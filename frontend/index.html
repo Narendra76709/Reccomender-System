@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CineMatch &mdash; Hybrid Movie Recommender</title>
+  <style>
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a24;
+      --surface2: #23232f;
+      --accent: #7c6af7;
+      --accent2: #a78bfa;
+      --text: #e2e2ef;
+      --muted: #888899;
+      --card-hover: #2a2a3a;
+      --badge: #312e5e;
+      --success: #4ade80;
+      --danger: #f87171;
+      --border: #2e2e40;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ───────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-size: 1.4rem; font-weight: 700; color: var(--accent2); letter-spacing: -0.5px; }
+    .logo span { color: var(--text); }
+
+    /* ── Status pill ──────────────────────────────────── */
+    #status-pill {
+      font-size: 0.75rem;
+      padding: 4px 12px;
+      border-radius: 99px;
+      background: var(--badge);
+      color: var(--muted);
+    }
+    #status-pill.ok { background: #14532d; color: var(--success); }
+
+    /* ── Main layout ──────────────────────────────────── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    /* ── Hero / Search ────────────────────────────────── */
+    .hero { text-align: center; padding: 3rem 1rem 2rem; }
+    .hero h1 { font-size: 2.4rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .hero h1 span { color: var(--accent2); }
+    .hero p { color: var(--muted); margin-bottom: 2rem; font-size: 1.05rem; }
+
+    .search-row {
+      display: flex;
+      gap: 0.5rem;
+      max-width: 600px;
+      margin: 0 auto 1rem;
+      position: relative;
+    }
+    input[type=text], input[type=number] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.7rem 1rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    input[type=text]:focus, input[type=number]:focus { border-color: var(--accent); }
+    input[type=text] { flex: 1; }
+
+    .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0.7rem 1.4rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: background .2s, transform .1s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--accent2); }
+    .btn:active { transform: scale(0.97); }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent2); background: transparent; }
+
+    /* ── Autocomplete ─────────────────────────────────── */
+    #autocomplete {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 60px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      z-index: 200;
+      overflow: hidden;
+      display: none;
+    }
+    .ac-item {
+      padding: 0.6rem 1rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .ac-item:last-child { border-bottom: none; }
+    .ac-item:hover { background: var(--card-hover); }
+    .ac-item small { color: var(--muted); }
+
+    /* ── User ID row ──────────────────────────────────── */
+    .uid-row {
+      display: flex;
+      gap: 0.5rem;
+      max-width: 400px;
+      margin: 0 auto;
+      align-items: center;
+      justify-content: center;
+    }
+    .uid-row label { color: var(--muted); font-size: 0.9rem; }
+    .uid-row input { width: 120px; }
+
+    /* ── Genre tabs ───────────────────────────────────── */
+    .genre-bar {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 1.5rem 0;
+    }
+    .genre-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.35rem 0.9rem;
+      border-radius: 99px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .genre-btn:hover, .genre-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ── Section headers ──────────────────────────────── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.2rem;
+    }
+    .section-header h2 { font-size: 1.25rem; font-weight: 700; }
+    .badge {
+      background: var(--badge);
+      color: var(--accent2);
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 99px;
+    }
+
+    /* ── Movie grid ───────────────────────────────────── */
+    .movie-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .movie-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      cursor: pointer;
+      transition: background .2s, transform .2s, border-color .2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .movie-card:hover {
+      background: var(--card-hover);
+      transform: translateY(-3px);
+      border-color: var(--accent);
+    }
+    .movie-card .rank {
+      position: absolute;
+      top: 8px; left: 8px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 99px;
+    }
+    .movie-card .score-badge {
+      position: absolute;
+      top: 8px; right: 8px;
+      background: var(--badge);
+      color: var(--accent2);
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      border-radius: 99px;
+    }
+    .movie-card .poster {
+      width: 100%;
+      aspect-ratio: 2/3;
+      background: var(--surface2);
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      color: var(--muted);
+    }
+    .movie-card h3 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+      line-height: 1.3;
+    }
+    .movie-card .genres {
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .movie-card .rating-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .star { color: #f59e0b; }
+
+    /* ── Loading spinner ──────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 28px; height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-row { display: flex; justify-content: center; padding: 3rem; }
+
+    /* ── Empty state ──────────────────────────────────── */
+    .empty { text-align: center; color: var(--muted); padding: 3rem; font-size: 1rem; }
+
+    /* ── Modal ────────────────────────────────────────── */
+    #modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal-overlay.open { display: flex; }
+    #modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      max-width: 560px;
+      width: 90%;
+      position: relative;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    #modal .close-btn {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      background: var(--surface2);
+      border: none;
+      color: var(--text);
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1.1rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #modal h2 { font-size: 1.35rem; margin-bottom: 0.3rem; padding-right: 2.5rem; }
+    #modal .modal-genres { color: var(--accent2); font-size: 0.85rem; margin-bottom: 1rem; }
+    #modal .modal-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    #modal .stat-box {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 0.75rem;
+      text-align: center;
+    }
+    #modal .stat-box .val { font-size: 1.4rem; font-weight: 700; color: var(--accent2); }
+    #modal .stat-box .lbl { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+    #modal .similar-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.6rem; color: var(--muted); }
+    #modal .similar-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;
+    }
+    #modal .sim-card {
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 0.6rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+      border: 1px solid transparent;
+      transition: border-color .2s;
+    }
+    #modal .sim-card:hover { border-color: var(--accent); }
+    #modal .sim-card .sim-title { font-weight: 600; margin-bottom: 2px; }
+    #modal .sim-card .sim-genre { color: var(--muted); font-size: 0.72rem; }
+
+    /* ── Toast ────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 2rem; right: 2rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.8rem 1.4rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity .3s, transform .3s;
+      z-index: 600;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── Tabs ─────────────────────────────────────────── */
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+    .tab {
+      padding: 0.6rem 1.2rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      transition: color .2s, border-color .2s;
+      margin-bottom: -1px;
+    }
+    .tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+    .tab:hover { color: var(--text); }
+
+    /* ── Responsive ───────────────────────────────────── */
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 1.8rem; }
+      header { padding: 0 1rem; }
+      .container { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Cine<span>Match</span></div>
+  <div id="status-pill">Loading...</div>
+</header>
+
+<div class="container">
+  <!-- Hero -->
+  <div class="hero">
+    <h1>Find Your Next <span>Favorite Movie</span></h1>
+    <p>Powered by a Hybrid Two-Stage Recommendation System (NMF + SVD + LightGBM)</p>
+
+    <!-- Search bar -->
+    <div class="search-row">
+      <div style="position:relative; flex:1;">
+        <input type="text" id="search-input" placeholder="Search movies..." autocomplete="off"/>
+        <div id="autocomplete"></div>
+      </div>
+      <button class="btn" onclick="doSearch()">Search</button>
+    </div>
+
+    <!-- User ID -->
+    <div class="uid-row">
+      <label>User ID:</label>
+      <input type="number" id="user-id" value="1" min="1"/>
+      <button class="btn" onclick="loadPersonalized()">Get Recs</button>
+      <button class="btn btn-outline" onclick="loadPopular()">Popular</button>
+    </div>
+  </div>
+
+  <!-- Genre bar -->
+  <div class="genre-bar" id="genre-bar">
+    <button class="genre-btn active" onclick="selectGenre(this, '')">All</button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab(this,'recs')">Recommendations</div>
+    <div class="tab" onclick="switchTab(this,'search')">Search Results</div>
+    <div class="tab" onclick="switchTab(this,'popular')">Popular</div>
+  </div>
+
+  <!-- Recs panel -->
+  <div id="panel-recs">
+    <div class="section-header">
+      <h2 id="recs-title">Personalized Recommendations</h2>
+      <span class="badge" id="recs-badge">User 1</span>
+    </div>
+    <div id="recs-grid" class="movie-grid"></div>
+  </div>
+
+  <!-- Search panel -->
+  <div id="panel-search" style="display:none;">
+    <div class="section-header">
+      <h2>Search Results</h2>
+      <span class="badge" id="search-badge">0 results</span>
+    </div>
+    <div id="search-grid" class="movie-grid"></div>
+  </div>
+
+  <!-- Popular panel -->
+  <div id="panel-popular" style="display:none;">
+    <div class="section-header">
+      <h2>Popular Movies</h2>
+      <span class="badge" id="pop-badge"></span>
+    </div>
+    <div id="popular-grid" class="movie-grid"></div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay" onclick="closeModal(event)">
+  <div id="modal">
+    <button class="close-btn" onclick="closeModal(null)">&times;</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+const API = '';
+let allGenres = [];
+let activeGenre = '';
+let currentTab = 'recs';
+
+// ── Utilities ─────────────────────────────────────────────────────────
+
+function showToast(msg, duration=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function setLoading(gridId) {
+  document.getElementById(gridId).innerHTML =
+    '<div class="loading-row"><div class="spinner"></div></div>';
+}
+
+function switchTab(el, name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['recs','search','popular'].forEach(p => {
+    document.getElementById('panel-'+p).style.display = p===name ? '' : 'none';
+  });
+  currentTab = name;
+}
+
+function selectGenre(el, genre) {
+  document.querySelectorAll('.genre-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  activeGenre = genre;
+  if (currentTab === 'popular') loadPopular();
+}
+
+// ── Status ────────────────────────────────────────────────────────────
+
+async function checkStatus() {
+  try {
+    const r = await fetch(API + '/api/status');
+    const d = await r.json();
+    const pill = document.getElementById('status-pill');
+    if (d.ready) {
+      pill.textContent = `Ready | ${d.n_movies.toLocaleString()} movies`;
+      pill.classList.add('ok');
+    } else {
+      pill.textContent = 'Not ready';
+    }
+  } catch(e) {
+    document.getElementById('status-pill').textContent = 'Offline';
+  }
+}
+
+// ── Genres ────────────────────────────────────────────────────────────
+
+async function loadGenres() {
+  try {
+    const r = await fetch(API + '/api/genres');
+    allGenres = await r.json();
+    const bar = document.getElementById('genre-bar');
+    allGenres.forEach(g => {
+      const btn = document.createElement('button');
+      btn.className = 'genre-btn';
+      btn.textContent = g;
+      btn.onclick = () => selectGenre(btn, g);
+      bar.appendChild(btn);
+    });
+  } catch(e) {}
+}
+
+// ── Movie cards ───────────────────────────────────────────────────────
+
+const EMOJIS = ['🎬','🎭','🎥','🎞','🍿'];
+
+function movieCard(m, rank) {
+  const emoji = EMOJIS[m.movieId % EMOJIS.length];
+  const genres = (m.genres || '').replace(/\|/g, ' · ');
+  const rating = m.mean_rating ? m.mean_rating.toFixed(1) : '';
+  const score = m.score ? m.score.toFixed(3) : '';
+  return `
+    <div class="movie-card" onclick="openModal(${m.movieId})">
+      ${rank ? `<div class="rank">#${rank}</div>` : ''}
+      ${score ? `<div class="score-badge">${score}</div>` : ''}
+      <div class="poster">${emoji}</div>
+      <h3>${escHtml(m.title)}</h3>
+      <div class="genres">${escHtml(genres)}</div>
+      ${rating ? `<div class="rating-row"><span class="star">&#9733;</span>${rating}
+        ${m.n_ratings ? `<span style="margin-left:auto;font-size:.72rem">${fmtNum(m.n_ratings)} ratings</span>` : ''}
+      </div>` : ''}
+    </div>`;
+}
+
+function escHtml(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+function fmtNum(n) {
+  if (n >= 1000000) return (n/1000000).toFixed(1)+'M';
+  if (n >= 1000) return (n/1000).toFixed(1)+'K';
+  return String(n);
+}
+
+function renderGrid(gridId, movies, showRank=false) {
+  const el = document.getElementById(gridId);
+  if (!movies || !movies.length) {
+    el.innerHTML = '<div class="empty">No results found.</div>';
+    return;
+  }
+  el.innerHTML = movies.map((m,i) => movieCard(m, showRank ? i+1 : null)).join('');
+}
+
+// ── Personalized recs ─────────────────────────────────────────────────
+
+async function loadPersonalized() {
+  const uid = parseInt(document.getElementById('user-id').value) || 1;
+  switchTab(document.querySelector('.tab'), 'recs');
+  document.querySelectorAll('.tab')[0].click();
+  document.getElementById('recs-title').textContent = 'Personalized Recommendations';
+  document.getElementById('recs-badge').textContent = `User ${uid}`;
+  setLoading('recs-grid');
+  try {
+    const r = await fetch(API + `/api/recommend?user_id=${uid}&top_k=12`);
+    const data = await r.json();
+    renderGrid('recs-grid', data, true);
+  } catch(e) {
+    document.getElementById('recs-grid').innerHTML = '<div class="empty">Error loading recommendations.</div>';
+    showToast('Could not fetch recommendations');
+  }
+}
+
+// ── Popular ───────────────────────────────────────────────────────────
+
+async function loadPopular() {
+  document.querySelectorAll('.tab')[2].click();
+  const genre = activeGenre;
+  document.getElementById('pop-badge').textContent = genre || 'All genres';
+  setLoading('popular-grid');
+  try {
+    const url = API + `/api/popular?limit=24${genre ? '&genre='+encodeURIComponent(genre) : ''}`;
+    const r = await fetch(url);
+    const data = await r.json();
+    renderGrid('popular-grid', data, true);
+  } catch(e) {
+    document.getElementById('popular-grid').innerHTML = '<div class="empty">Error loading popular movies.</div>';
+  }
+}
+
+// ── Search ────────────────────────────────────────────────────────────
+
+let searchTimer = null;
+
+document.getElementById('search-input').addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  const q = this.value.trim();
+  if (!q) { hideAutocomplete(); return; }
+  searchTimer = setTimeout(() => fetchAutocomplete(q), 250);
+});
+
+document.getElementById('search-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { doSearch(); hideAutocomplete(); }
+});
+
+async function fetchAutocomplete(q) {
+  try {
+    const r = await fetch(API + `/api/search?q=${encodeURIComponent(q)}&limit=6`);
+    const data = await r.json();
+    showAutocomplete(data);
+  } catch(e) {}
+}
+
+function showAutocomplete(items) {
+  const ac = document.getElementById('autocomplete');
+  if (!items.length) { ac.style.display='none'; return; }
+  ac.innerHTML = items.map(m => `
+    <div class="ac-item" onclick="selectAC(${m.movieId}, '${escHtml(m.title).replace(/'/g,"\\'")}')">
+      <strong>${escHtml(m.title)}</strong>
+      <small> &mdash; ${escHtml((m.genres||'').replace(/\|/g,', '))}</small>
+    </div>`).join('');
+  ac.style.display = 'block';
+}
+
+function hideAutocomplete() {
+  document.getElementById('autocomplete').style.display = 'none';
+}
+
+function selectAC(id, title) {
+  document.getElementById('search-input').value = title;
+  hideAutocomplete();
+  openModal(id);
+}
+
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  hideAutocomplete();
+  document.querySelectorAll('.tab')[1].click();
+  document.getElementById('search-badge').textContent = 'Searching...';
+  setLoading('search-grid');
+  try {
+    const r = await fetch(API + `/api/search?q=${encodeURIComponent(q)}&limit=24`);
+    const data = await r.json();
+    document.getElementById('search-badge').textContent = `${data.length} results`;
+    renderGrid('search-grid', data, false);
+  } catch(e) {
+    document.getElementById('search-grid').innerHTML = '<div class="empty">Search error.</div>';
+  }
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.search-row')) hideAutocomplete();
+});
+
+// ── Modal ─────────────────────────────────────────────────────────────
+
+async function openModal(movieId) {
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('modal-content').innerHTML =
+    '<div class="loading-row"><div class="spinner"></div></div>';
+  try {
+    const r = await fetch(API + `/api/movie/${movieId}`);
+    if (!r.ok) throw new Error('Not found');
+    const m = await r.json();
+    const genres = (m.genres||'').replace(/\|/g,' · ');
+    const similar = (m.similar||[]).slice(0,6);
+    document.getElementById('modal-content').innerHTML = `
+      <h2>${escHtml(m.title)}</h2>
+      <div class="modal-genres">${escHtml(genres)}</div>
+      <div class="modal-stats">
+        <div class="stat-box">
+          <div class="val">${m.mean_rating ? m.mean_rating.toFixed(1) : 'N/A'}</div>
+          <div class="lbl">Avg Rating</div>
+        </div>
+        <div class="stat-box">
+          <div class="val">${fmtNum(m.n_ratings||0)}</div>
+          <div class="lbl">Ratings</div>
+        </div>
+        <div class="stat-box">
+          <div class="val">${m.pop_score ? m.pop_score.toFixed(2) : '0'}</div>
+          <div class="lbl">Pop Score</div>
+        </div>
+      </div>
+      ${similar.length ? `
+        <div class="similar-title">Similar Movies</div>
+        <div class="similar-grid">
+          ${similar.map(s => `
+            <div class="sim-card" onclick="openModal(${s.movieId})">
+              <div class="sim-title">${escHtml(s.title)}</div>
+              <div class="sim-genre">${escHtml((s.genres||'').replace(/\|/g,' · '))}</div>
+            </div>`).join('')}
+        </div>` : ''}
+    `;
+  } catch(e) {
+    document.getElementById('modal-content').innerHTML =
+      '<div class="empty">Could not load movie details.</div>';
+  }
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+
+async function init() {
+  await checkStatus();
+  await loadGenres();
+  await loadPersonalized();
+}
+
+init();
+</script>
+</body>
+</html>
